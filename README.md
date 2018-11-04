@@ -1,6 +1,6 @@
 # Lightweight Auto Restart Module for Golang
 
-Utility `gouto` (golang auto) - very simple and lightweight auto reload tool.
+Utility `gouto` (golang auto) - very simple and lightweight auto restart tool.
 
 ## Installation
 
