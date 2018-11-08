@@ -4,7 +4,6 @@ import (
 	"flag"
 	"log"
 	"os"
-	"runtime"
 	"time"
 
 	"github.com/fatih/color"
@@ -19,8 +18,7 @@ const Pattern = `(.+\.go)$`
 
 var (
 	flagDirectory = flag.String("dir", ".", "Directory to watch for changes")
-	flagOutput    = flag.String("out", ".", "Output directory for binary after build")
-	flagRun       = flag.String("run", "", "Command to run after build")
+	flagStart     = flag.String("start", "", "Command to run after build")
 	flagBuild     = flag.String("build", "go build", "Command to rebuild after changes")
 )
 
@@ -73,24 +71,19 @@ func watchFiles() {
 }
 
 func onChange(event fsnotify.Event) {
-	var trigger bool
-
-	switch runtime.GOOS {
-	case "darwin", "freebsd", "openbsd", "netbsd", "dragonfly":
-		trigger = event.Op == fsnotify.Create || event.Op == fsnotify.Write
-	case "linux":
-		trigger = event.Op == fsnotify.Create || event.Op == fsnotify.Write
-	default:
-		trigger = event.Op == fsnotify.Create
-		log.Println(colorFail("Unidentified GOOS. Module may not work correctly"))
-	}
+	trigger := event.Op&fsnotify.Remove == fsnotify.Remove || event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Create == fsnotify.Create
 
 	if trigger {
 		time.Sleep(100 * time.Millisecond)
-		afterChange()
+		build()
+		start()
 	}
 }
 
-func afterChange() {
-	log.Println(colorSuccess("Success!"))
+func build() {
+	log.Println(colorSuccess("Success build"))
+}
+
+func start() {
+	log.Println(colorSuccess("Success start"))
 }
