@@ -4,8 +4,11 @@ import (
 	"flag"
 	"log"
 	"os"
+	"runtime"
+	"time"
 
 	"github.com/fatih/color"
+	"github.com/fsnotify/fsnotify"
 )
 
 // Delay - milliseconds to wait before begin next job after a file change
@@ -37,11 +40,57 @@ func main() {
 		os.Exit(1)
 	}
 
-	result := true
+	watchFiles()
+}
 
-	if result != false {
-		log.Println(colorSuccess("Success!"))
-	} else {
-		log.Println(colorFail("Fail!"))
+func watchFiles() {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Println(colorFail("Failed to setup watcher"))
+		os.Exit(1)
 	}
+	defer watcher.Close()
+
+	done := make(chan bool)
+	go func() {
+		for {
+			select {
+			case err := <-watcher.Errors:
+				log.Println(colorFail("Failed to reload"), err)
+			case event := <-watcher.Events:
+				onChange(event)
+			}
+		}
+	}()
+
+	if err := watcher.Add(*flagDirectory); err != nil {
+		log.Println(colorFail("Failed to add provided folder to watcher"))
+		os.Exit(1)
+	}
+
+	log.Println(colorSuccess("Waiting for changes..."))
+	<-done
+}
+
+func onChange(event fsnotify.Event) {
+	var trigger bool
+
+	switch runtime.GOOS {
+	case "darwin", "freebsd", "openbsd", "netbsd", "dragonfly":
+		trigger = event.Op == fsnotify.Create || event.Op == fsnotify.Write
+	case "linux":
+		trigger = event.Op == fsnotify.Create || event.Op == fsnotify.Write
+	default:
+		trigger = event.Op == fsnotify.Create
+		log.Println(colorFail("Unidentified GOOS. Module may not work correctly"))
+	}
+
+	if trigger {
+		time.Sleep(100 * time.Millisecond)
+		afterChange()
+	}
+}
+
+func afterChange() {
+	log.Println(colorSuccess("Success!"))
 }
