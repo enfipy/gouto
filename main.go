@@ -28,19 +28,19 @@ var (
 	outDir = ""
 )
 
-func colorSuccess(format string) string {
-	return color.GreenString(format)
+func printSuccess(format string) {
+	log.Println(color.GreenString(format))
 }
 
-func colorFail(format string) string {
-	return color.RedString(format)
+func printFail(format string, errors ...string) {
+	log.Println(color.RedString(format, errors))
 }
 
 func main() {
 	flag.Parse()
 
 	if *flagDirectory == "" {
-		log.Println(colorFail("Directory flag is required"))
+		printFail("Directory flag is required")
 		os.Exit(1)
 	}
 
@@ -50,14 +50,14 @@ func main() {
 func watchFiles() {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		log.Println(colorFail("Failed to setup watcher"), colorFail(err.Error()))
+		printFail("Failed to setup watcher: ", err.Error())
 		os.Exit(1)
 	}
 	defer watcher.Close()
 
 	outDir, err = filepath.Abs(*flagOutput)
 	if outDir == "" {
-		log.Println(colorFail("Invalid output directory"), colorFail(err.Error()))
+		printFail("Invalid output directory: ", err.Error())
 		os.Exit(1)
 	}
 
@@ -66,7 +66,7 @@ func watchFiles() {
 		for {
 			select {
 			case err := <-watcher.Errors:
-				log.Println(colorFail("Failed to reload"), colorFail(err.Error()))
+				printFail("Failed to reload: ", err.Error())
 			case event := <-watcher.Events:
 				onChange(event)
 			}
@@ -74,7 +74,7 @@ func watchFiles() {
 	}()
 
 	if err := watcher.Add(*flagDirectory); err != nil {
-		log.Println(colorFail("Failed to add provided folder to watcher"), colorFail(err.Error()))
+		printFail("Failed to add provided folder to watcher: ", err.Error())
 		os.Exit(1)
 	}
 
@@ -82,7 +82,7 @@ func watchFiles() {
 		start()
 	}
 
-	log.Println(colorSuccess("Waiting for changes..."))
+	printSuccess("Waiting for changes...")
 	<-done
 }
 
@@ -91,7 +91,7 @@ func onChange(event fsnotify.Event) {
 
 	if trigger {
 		time.Sleep(100 * time.Millisecond)
-		log.Println(colorSuccess("Restarting..."))
+		printSuccess("Restarting...")
 		if build() {
 			start()
 		}
@@ -110,7 +110,7 @@ func build() bool {
 	cmd.Dir = *flagDirectory
 
 	if output, err := cmd.CombinedOutput(); err != nil {
-		log.Println(colorFail("Failed while building:"), colorFail(string(output)))
+		printFail("Failed while building: ", string(output))
 		return false
 	}
 	return true
@@ -120,10 +120,10 @@ func start() {
 	cmd := exec.Command(outDir)
 
 	if err := cmd.Start(); err != nil {
-		log.Println(colorFail("Failed while running:"), colorFail(err.Error()))
+		printFail("Failed while running: ", err.Error())
 	}
 
-	log.Println(colorSuccess("Started"))
+	printSuccess("Started")
 
 	// Todo: Make logging to console
 }
