@@ -78,6 +78,19 @@ func watchFiles() {
 		os.Exit(1)
 	}
 
+	err = filepath.Walk(*flagDirectory, func(path string, info os.FileInfo, err error) error {
+		if err == nil && info.IsDir() {
+			return watcher.Add(path)
+		}
+		return err
+	})
+	if err != nil {
+		printFail("Failed to add inner folder for watching: ", err.Error())
+	}
+	if err := watcher.Add(*flagDirectory); err != nil {
+		printFail("Failed to add folder for watching: ", err.Error())
+	}
+
 	if build() {
 		start()
 	}
