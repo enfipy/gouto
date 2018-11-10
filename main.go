@@ -21,7 +21,6 @@ const Delay = 100
 var (
 	flagDirectory = flag.String("dir", "./", "Directory to watch for changes")
 	flagOutput    = flag.String("out", "./cmd/app", "Output directory for binary after build")
-	flagArguments = flag.String("args", "", "Arguments to run binary after build")
 	flagBuild     = flag.String("build", "go build", "Command to rebuild after changes")
 
 	outDir = ""
