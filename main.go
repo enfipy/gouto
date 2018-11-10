@@ -15,11 +15,8 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-// Delay - milliseconds to wait before begin next job after a file change
-const Delay = 1000
-
-// Pattern - watched files extensions pattern
-const Pattern = `(.+\.go)$`
+// Delay - milliseconds to wait before restart after a file change
+const Delay = 100
 
 var (
 	flagDirectory = flag.String("dir", "./", "Directory to watch for changes")
@@ -64,6 +61,9 @@ func setupWatcher() {
 	}
 
 	watchFiles(watcher)
+	if build() {
+		runBinary()
+	}
 
 	printSuccess("Waiting for changes...")
 	for {
@@ -71,7 +71,14 @@ func setupWatcher() {
 		case err := <-watcher.Errors:
 			printFail("Failed to reload: ", err.Error())
 		case event := <-watcher.Events:
-			onChange(event)
+			if event.Op&fsnotify.Remove == fsnotify.Remove || event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Create == fsnotify.Create {
+				time.Sleep(Delay * time.Millisecond)
+				printSuccess("Restarting...")
+				if build() {
+					runBinary()
+					printSuccess("Started")
+				}
+			}
 		}
 	}
 }
@@ -92,19 +99,6 @@ func watchFiles(watcher *fsnotify.Watcher) {
 	if err != nil {
 		printFail("Failed to add folder for watching: ", err.Error())
 		os.Exit(1)
-	}
-}
-
-func onChange(event fsnotify.Event) {
-	trigger := event.Op&fsnotify.Remove == fsnotify.Remove || event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Create == fsnotify.Create
-
-	if trigger {
-		time.Sleep(100 * time.Millisecond)
-		printSuccess("Restarting...")
-		if build() {
-			runBinary()
-			printSuccess("Started")
-		}
 	}
 }
 
