@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"flag"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -44,10 +46,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	watchFiles()
+	setupWatcher()
 }
 
-func watchFiles() {
+func setupWatcher() {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		printFail("Failed to setup watcher: ", err.Error())
@@ -61,42 +63,36 @@ func watchFiles() {
 		os.Exit(1)
 	}
 
-	done := make(chan bool)
-	go func() {
-		for {
-			select {
-			case err := <-watcher.Errors:
-				printFail("Failed to reload: ", err.Error())
-			case event := <-watcher.Events:
-				onChange(event)
-			}
+	watchFiles(watcher)
+
+	printSuccess("Waiting for changes...")
+	for {
+		select {
+		case err := <-watcher.Errors:
+			printFail("Failed to reload: ", err.Error())
+		case event := <-watcher.Events:
+			onChange(event)
 		}
-	}()
-
-	if err := watcher.Add(*flagDirectory); err != nil {
-		printFail("Failed to add provided folder to watcher: ", err.Error())
-		os.Exit(1)
 	}
+}
 
-	err = filepath.Walk(*flagDirectory, func(path string, info os.FileInfo, err error) error {
+func watchFiles(watcher *fsnotify.Watcher) {
+	err := filepath.Walk(*flagDirectory, func(path string, info os.FileInfo, err error) error {
 		if err == nil && info.IsDir() {
 			return watcher.Add(path)
 		}
 		return err
 	})
 	if err != nil {
-		printFail("Failed to add inner folder for watching: ", err.Error())
+		printFail("Failed to add inner folders for watching: ", err.Error())
+		os.Exit(1)
 	}
-	if err := watcher.Add(*flagDirectory); err != nil {
+
+	err = watcher.Add(*flagDirectory)
+	if err != nil {
 		printFail("Failed to add folder for watching: ", err.Error())
+		os.Exit(1)
 	}
-
-	if build() {
-		start()
-	}
-
-	printSuccess("Waiting for changes...")
-	<-done
 }
 
 func onChange(event fsnotify.Event) {
@@ -106,7 +102,8 @@ func onChange(event fsnotify.Event) {
 		time.Sleep(100 * time.Millisecond)
 		printSuccess("Restarting...")
 		if build() {
-			start()
+			runBinary()
+			printSuccess("Started")
 		}
 	}
 }
@@ -116,7 +113,6 @@ func build() bool {
 	if len(args) == 0 {
 		return true
 	}
-	// args = append(args, "-a")
 	args = append(args, "-o", outDir)
 
 	cmd := exec.Command(args[0], args[1:]...)
@@ -129,14 +125,39 @@ func build() bool {
 	return true
 }
 
-func start() {
+func runBinary() *exec.Cmd {
+	var stdout, stderr io.ReadCloser
+	var err error
+
 	cmd := exec.Command(outDir)
 
-	if err := cmd.Start(); err != nil {
-		printFail("Failed while running: ", err.Error())
+	if stdout, err = cmd.StdoutPipe(); err != nil {
+		printFail("Failed get stdout pipe: ", err.Error())
+		return nil
+	}
+	if stderr, err = cmd.StderrPipe(); err != nil {
+		printFail("Failed get stderr pipe: ", err.Error())
+		return nil
 	}
 
-	printSuccess("Started")
+	go logger(stdout)
+	go logger(stderr)
 
-	// Todo: Make logging to console
+	if err = cmd.Start(); err != nil {
+		printFail("Failed while running: ", err.Error())
+		return nil
+	}
+	return cmd
+}
+
+func logger(pipe io.ReadCloser) {
+	reader := bufio.NewReader(pipe)
+
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			break
+		}
+		log.Print(line)
+	}
 }
