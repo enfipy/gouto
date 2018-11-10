@@ -61,8 +61,10 @@ func setupWatcher() {
 	}
 
 	watchFiles(watcher)
+
+	var currentProcess *os.Process
 	if build() {
-		runBinary()
+		currentProcess = runBinary().Process
 	}
 
 	printSuccess("Waiting for changes...")
@@ -73,9 +75,14 @@ func setupWatcher() {
 		case event := <-watcher.Events:
 			if event.Op&fsnotify.Remove == fsnotify.Remove || event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Create == fsnotify.Create {
 				time.Sleep(Delay * time.Millisecond)
+
+				if currentProcess != nil {
+					killProcess(currentProcess)
+				}
+
 				printSuccess("Restarting...")
 				if build() {
-					runBinary()
+					currentProcess = runBinary().Process
 					printSuccess("Started")
 				}
 			}
@@ -153,5 +160,14 @@ func logger(pipe io.ReadCloser) {
 			break
 		}
 		log.Print(line)
+	}
+}
+
+func killProcess(process *os.Process) {
+	if err := process.Kill(); err != nil {
+		printFail("Can not kill current process: ", err.Error())
+	}
+	if _, err := process.Wait(); err != nil {
+		printFail("Can not wait for exiting of current process")
 	}
 }
