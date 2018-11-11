@@ -30,7 +30,7 @@ func printSuccess(format string) {
 	log.Println(color.GreenString(format))
 }
 
-func printFail(format string, err string) {
+func printFail(format string, err ...string) {
 	log.Println(color.RedString(format, err))
 }
 
@@ -38,7 +38,7 @@ func main() {
 	flag.Parse()
 
 	if *flagDirectory == "" {
-		printFail("Directory flag is required", "")
+		printFail("Directory flag is required")
 		os.Exit(1)
 	}
 
@@ -64,9 +64,9 @@ func setupWatcher() {
 	var currentProcess *os.Process
 	if build() {
 		currentProcess = runBinary().Process
+		printSuccess("Waiting for changes...")
 	}
 
-	printSuccess("Waiting for changes...")
 	for {
 		select {
 		case err := <-watcher.Errors:
