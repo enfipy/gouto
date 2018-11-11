@@ -30,15 +30,15 @@ func printSuccess(format string) {
 	log.Println(color.GreenString(format))
 }
 
-func printFail(format string, errors ...string) {
-	log.Println(color.RedString(format, errors))
+func printFail(format string, err string) {
+	log.Println(color.RedString(format, err))
 }
 
 func main() {
 	flag.Parse()
 
 	if *flagDirectory == "" {
-		printFail("Directory flag is required")
+		printFail("Directory flag is required", "")
 		os.Exit(1)
 	}
 
@@ -167,6 +167,6 @@ func killProcess(process *os.Process) {
 		printFail("Can not kill current process: ", err.Error())
 	}
 	if _, err := process.Wait(); err != nil {
-		printFail("Can not wait for exiting of current process")
+		printFail("Can not wait for exiting of current process: ", err.Error())
 	}
 }
