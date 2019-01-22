@@ -30,7 +30,7 @@ func printSuccess(format string) {
 	log.Println(color.GreenString(format))
 }
 
-func printFail(format string, err ...string) {
+func printFail(format string, err ...interface{}) {
 	log.Println(color.RedString(format, err))
 }
 
@@ -119,7 +119,7 @@ func build() bool {
 	cmd.Dir = *flagDirectory
 
 	if output, err := cmd.CombinedOutput(); err != nil {
-		printFail("Failed while building: ", string(output))
+		printFail("Failed while building:\n%s", output)
 		return false
 	}
 	return true
@@ -158,7 +158,7 @@ func logger(pipe io.ReadCloser) {
 		if err != nil {
 			break
 		}
-		log.Print(line)
+		log.Printf("%+v", line)
 	}
 }
 
